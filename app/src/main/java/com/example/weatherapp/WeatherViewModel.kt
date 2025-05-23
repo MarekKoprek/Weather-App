@@ -52,7 +52,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     private val _currentUnits = MutableStateFlow("metric")
     val currentUnits: StateFlow<String> = _currentUnits.asStateFlow()
 
-    private val _refreshIntervalSeconds = MutableStateFlow("15")
+    private val _refreshIntervalSeconds = MutableStateFlow("0")
     val refreshIntervalSeconds: StateFlow<String> = _refreshIntervalSeconds.asStateFlow()
 
     private var autoRefreshJob: Job? = null
@@ -374,6 +374,9 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                             fetchWeatherForecastForCity()
                         }
                     }
+                }
+                else {
+                    delay(1000)
                 }
             }
         }

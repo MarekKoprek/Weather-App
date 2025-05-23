@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     MainScreenView(
                         modifier = Modifier.padding(innerPadding),
-                        widthSizeClass = windowSizeClass.widthSizeClass
+                        windowSizeClass = windowSizeClass
                     )
                 }
             }

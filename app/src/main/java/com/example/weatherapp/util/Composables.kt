@@ -1,7 +1,9 @@
 package com.example.weatherapp.util
 
 import android.content.res.Configuration
+import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +51,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.windowsizeclass.WindowHeightSizeClass
+import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -84,7 +88,7 @@ import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 @Composable
 fun MainScreenView(
     modifier: Modifier = Modifier,
-    widthSizeClass: WindowWidthSizeClass,
+    windowSizeClass: WindowSizeClass,
     weatherViewModel: WeatherViewModel = viewModel()
 ) {
     val configuration = LocalConfiguration.current
@@ -97,12 +101,26 @@ fun MainScreenView(
     val currentUnits by weatherViewModel.currentUnits.collectAsState()
     val currentInterval by weatherViewModel.refreshIntervalSeconds.collectAsState()
 
-    var topText by remember { mutableStateOf("Podstawowe") }
-    var currentPage by remember { mutableIntStateOf(1) }
-    when (widthSizeClass) {
-        WindowWidthSizeClass.Medium -> currentPage = 6
-        WindowWidthSizeClass.Expanded -> currentPage = 6
+    var startPage: Int
+    when (configuration.orientation) {
+        Configuration.ORIENTATION_LANDSCAPE -> {
+            when (windowSizeClass.heightSizeClass) {
+                WindowHeightSizeClass.Medium -> startPage = 6
+                WindowHeightSizeClass.Expanded -> startPage = 6
+                else -> startPage = 1
+            }
+        }
+        else -> {
+            when (windowSizeClass.widthSizeClass) {
+                WindowWidthSizeClass.Medium -> startPage = 6
+                WindowWidthSizeClass.Expanded -> startPage = 6
+                else -> startPage = 1
+            }
+        }
     }
+
+    var topText by remember { mutableStateOf("Podstawowe") }
+    var currentPage by remember { mutableIntStateOf(startPage) }
 
     val updateTextBasedOnButton: (Int) -> Unit = { buttonNumber ->
         when (buttonNumber) {
@@ -124,8 +142,8 @@ fun MainScreenView(
 
     when (configuration.orientation) {
         Configuration.ORIENTATION_LANDSCAPE -> {
-            when(widthSizeClass) {
-                WindowWidthSizeClass.Compact -> {
+            when(windowSizeClass.heightSizeClass) {
+                WindowHeightSizeClass.Compact -> {
                     LandscapeLayout(
                         modifier = modifier,
                         currentText = topText,
@@ -162,7 +180,7 @@ fun MainScreenView(
             }
         }
         else -> {
-            when(widthSizeClass) {
+            when(windowSizeClass.widthSizeClass) {
                 WindowWidthSizeClass.Compact -> {
                     PortraitLayout(
                         modifier = modifier,
@@ -535,9 +553,9 @@ fun LandscapeLayout(
                         val weather = weatherViewModel?.loadWeatherData()
                         if (weather != null) {
                             if (currentPage == 1) {
-                                WeatherDetailsViewLandscape(weather, units, modifier)
+                                WeatherDetailsViewLandscape(weather, units)
                             } else {
-                                WeatherMoreDetailsViewLandscape(weather, units, modifier)
+                                WeatherMoreDetailsViewLandscape(weather, units, Modifier.fillMaxHeight())
                             }
                             Row(
                                 modifier = modifier.align(Alignment.BottomCenter)
@@ -579,9 +597,9 @@ fun LandscapeLayout(
                             is UiState.Success -> {
                                 val weather = weatherUiState.data
                                 if (currentPage == 1) {
-                                    WeatherDetailsViewLandscape(weather, units, modifier)
+                                    WeatherDetailsViewLandscape(weather, units)
                                 } else {
-                                    WeatherMoreDetailsViewLandscape(weather, units, modifier)
+                                    WeatherMoreDetailsViewLandscape(weather, units, Modifier.fillMaxHeight())
                                 }
                                 weatherViewModel?.saveWeatherData(weather)
                             }
@@ -590,9 +608,9 @@ fun LandscapeLayout(
                                 val weather = weatherViewModel?.loadWeatherData()
                                 if (weather != null) {
                                     if (currentPage == 1) {
-                                        WeatherDetailsViewLandscape(weather, units, modifier)
+                                        WeatherDetailsViewLandscape(weather, units)
                                     } else {
-                                        WeatherMoreDetailsViewLandscape(weather, units, modifier)
+                                        WeatherMoreDetailsViewLandscape(weather, units, Modifier.fillMaxHeight())
                                     }
                                     Row(
                                         modifier = modifier.align(Alignment.BottomCenter)
@@ -701,25 +719,35 @@ fun PortraitLayoutTablet(
             else if (!isNetworkAvailable) {
                 val weather = weatherViewModel?.loadWeatherData()
                 val forecast = weatherViewModel?.loadWeatherForecast()
-                Row(
-                    modifier = Modifier.fillMaxWidth()
+                Column(
+                    modifier = Modifier.fillMaxHeight()
                 ) {
-                    Column (
-                        modifier = Modifier.fillMaxHeight()
+                    Row (
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .weight(0.4f),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (weather != null) {
-                            WeatherDetailsView(weather, units, modifier)
-                            WeatherMoreDetailsView(weather, units, modifier)
+                            WeatherDetailsView(weather, units, Modifier.weight(0.5f))
+                            WeatherMoreDetailsView(weather, units, Modifier.weight(0.5f))
                         }
                         else {
                             Text(text = "Brak danych", color = Color.Red)
                         }
                     }
-                    if(forecast != null){
-                        WeatherForecastView(forecast, units)
-                    }
-                    else {
-                        Text(text = "Brak danych", color = Color.Red)
+                    Row (
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(0.6f),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (forecast != null) {
+                            WeatherForecastView(forecast, units)
+                        } else {
+                            Text(text = "Brak danych", color = Color.Red)
+                        }
                     }
                 }
                 Row(
@@ -733,25 +761,29 @@ fun PortraitLayoutTablet(
                     Text("Przestażałe dane")
                 }
             } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth()
+                Column(
+                    modifier = Modifier.fillMaxHeight()
                 ) {
-                    Column(
-                        modifier = Modifier.fillMaxHeight()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(0.4f),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         when (weatherUiState) {
                             is UiState.Loading -> CircularProgressIndicator()
                             is UiState.Success -> {
                                 val weather = weatherUiState.data
-                                WeatherDetailsView(weather, units, modifier)
-                                WeatherMoreDetailsView(weather, units, modifier)
+                                WeatherDetailsView(weather, units, Modifier.weight(0.5f))
+                                WeatherMoreDetailsView(weather, units, Modifier.weight(0.5f))
                                 weatherViewModel?.saveWeatherData(weather)
                             }
                             is UiState.Error -> {
                                 val weather = weatherViewModel?.loadWeatherData()
                                 if (weather != null) {
-                                    WeatherDetailsView(weather, units, modifier)
-                                    WeatherMoreDetailsView(weather, units, modifier)
+                                    WeatherDetailsView(weather, units, Modifier.weight(0.5f))
+                                    WeatherMoreDetailsView(weather, units, Modifier.weight(0.5f))
                                 }
                                 else {
                                     Text(text = "Brak danych", color = Color.Red)
@@ -759,19 +791,26 @@ fun PortraitLayoutTablet(
                             }
                         }
                     }
-                    when(forecastUiState) {
-                        is UiState.Loading -> CircularProgressIndicator()
-                        is UiState.Success -> {
-                            val forecast = forecastUiState.data
-                            WeatherForecastView(forecast, units)
-                            weatherViewModel?.saveWeatherForecast(forecast)
-                        }
-                        is UiState.Error -> {
-                            val forecast = weatherViewModel?.loadWeatherForecast()
-                            if (forecast != null) {
+                    Row (
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(0.6f),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        when(forecastUiState) {
+                            is UiState.Loading -> CircularProgressIndicator()
+                            is UiState.Success -> {
+                                val forecast = forecastUiState.data
                                 WeatherForecastView(forecast, units)
-                            } else {
-                                Text(text = "Brak danych", color = Color.Red)
+                                weatherViewModel?.saveWeatherForecast(forecast)
+                            }
+                            is UiState.Error -> {
+                                val forecast = weatherViewModel?.loadWeatherForecast()
+                                if (forecast != null) {
+                                    WeatherForecastView(forecast, units)
+                                } else {
+                                    Text(text = "Brak danych", color = Color.Red)
+                                }
                             }
                         }
                     }
@@ -864,28 +903,12 @@ fun LandscapeLayoutTablet(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Button(
-                onClick = { onButtonClick(1) },
+                onClick = { onButtonClick(6) },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             ) {
                 Icon(Icons.Filled.WbSunny, contentDescription = "", tint = MaterialTheme.colorScheme.onBackground)
-            }
-            Button(
-                onClick = { onButtonClick(2) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            ) {
-                Icon(Icons.Filled.Grain, contentDescription = "", tint = MaterialTheme.colorScheme.onBackground)
-            }
-            Button(
-                onClick = { onButtonClick(3) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            ) {
-                Icon(Icons.Filled.CalendarToday, contentDescription = "", tint = MaterialTheme.colorScheme.onBackground)
             }
             Button(
                 onClick = { onButtonClick(4) },
@@ -939,111 +962,112 @@ fun LandscapeLayoutTablet(
                     SettingsScreen(weatherViewModel, currentUnits, currentInterval, onRefreshClick)
                 }
                 else if (!isNetworkAvailable) {
-                    if(currentPage == 1 || currentPage == 2){
-                        val weather = weatherViewModel?.loadWeatherData()
-                        if (weather != null) {
-                            if (currentPage == 1) {
-                                WeatherDetailsViewLandscape(weather, units, modifier)
+                    val weather = weatherViewModel?.loadWeatherData()
+                    val forecast = weatherViewModel?.loadWeatherForecast()
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column (
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .weight(0.3f),
+                            verticalArrangement = Arrangement.Top
+                        ) {
+                            if (weather != null) {
+                                WeatherDetailsView(weather, units)
+                                WeatherMoreDetailsView(weather, units)
+                            }
+                            else {
+                                Text(text = "Brak danych", color = Color.Red)
+                            }
+                        }
+                        Column (
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .weight(0.7f),
+                            verticalArrangement = Arrangement.SpaceAround
+                        ) {
+                            if (forecast != null) {
+                                WeatherForecastView(forecast, units)
                             } else {
-                                WeatherMoreDetailsViewLandscape(weather, units, modifier)
+                                Text(text = "Brak danych", color = Color.Red)
                             }
-                            Row(
-                                modifier = modifier.align(Alignment.BottomCenter)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Warning,
-                                    contentDescription = "",
-                                    tint = Color.Yellow
-                                )
-                                Text("Przestażałe dane")
-                            }
-                        } else {
-                            Text(text = "Brak danych", color = Color.Red)
                         }
                     }
-                    else{
-                        val forecast = weatherViewModel?.loadWeatherForecast()
-                        if(forecast != null){
-                            WeatherForecastView(forecast, units)
-                            Row(
-                                modifier = modifier.align(Alignment.BottomCenter)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Warning,
-                                    contentDescription = "",
-                                    tint = Color.Yellow
-                                )
-                                Text("Przestażałe dane")
-                            }
-                        }
-                        else {
-                            Text(text = "Brak danych", color = Color.Red)
-                        }
+                    Row(
+                        modifier = modifier.align(Alignment.BottomCenter)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = "",
+                            tint = Color.Yellow
+                        )
+                        Text("Przestażałe dane")
                     }
                 } else {
-                    if(currentPage == 1 || currentPage == 2){
-                        when (weatherUiState) {
-                            is UiState.Loading -> CircularProgressIndicator()
-                            is UiState.Success -> {
-                                val weather = weatherUiState.data
-                                if (currentPage == 1) {
-                                    WeatherDetailsViewLandscape(weather, units, modifier)
-                                } else {
-                                    WeatherMoreDetailsViewLandscape(weather, units, modifier)
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .weight(0.3f),
+                            verticalArrangement = Arrangement.Top
+                        ) {
+                            when (weatherUiState) {
+                                is UiState.Loading -> CircularProgressIndicator()
+                                is UiState.Success -> {
+                                    val weather = weatherUiState.data
+                                    WeatherDetailsView(weather, units)
+                                    WeatherMoreDetailsView(weather, units)
+                                    weatherViewModel?.saveWeatherData(weather)
                                 }
-                                weatherViewModel?.saveWeatherData(weather)
+                                is UiState.Error -> {
+                                    val weather = weatherViewModel?.loadWeatherData()
+                                    if (weather != null) {
+                                        WeatherDetailsView(weather, units)
+                                        WeatherMoreDetailsView(weather, units)
+                                    }
+                                    else {
+                                        Text(text = "Brak danych", color = Color.Red)
+                                    }
+                                }
                             }
-
-                            is UiState.Error -> {
-                                val weather = weatherViewModel?.loadWeatherData()
-                                if (weather != null) {
-                                    if (currentPage == 1) {
-                                        WeatherDetailsViewLandscape(weather, units, modifier)
+                        }
+                        Column (
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .weight(0.7f),
+                            verticalArrangement = Arrangement.SpaceAround
+                        ) {
+                            when(forecastUiState) {
+                                is UiState.Loading -> CircularProgressIndicator()
+                                is UiState.Success -> {
+                                    val forecast = forecastUiState.data
+                                    WeatherForecastView(forecast, units)
+                                    weatherViewModel?.saveWeatherForecast(forecast)
+                                }
+                                is UiState.Error -> {
+                                    val forecast = weatherViewModel?.loadWeatherForecast()
+                                    if (forecast != null) {
+                                        WeatherForecastView(forecast, units)
                                     } else {
-                                        WeatherMoreDetailsViewLandscape(weather, units, modifier)
+                                        Text(text = "Brak danych", color = Color.Red)
                                     }
-                                    Row(
-                                        modifier = modifier.align(Alignment.BottomCenter)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Warning,
-                                            contentDescription = "",
-                                            tint = Color.Yellow
-                                        )
-                                        Text("Przestażałe dane")
-                                    }
-                                } else {
-                                    Text(text = "Brak danych", color = Color.Red)
                                 }
                             }
                         }
                     }
-                    else{
-                        when(forecastUiState) {
-                            is UiState.Loading -> CircularProgressIndicator()
-                            is UiState.Success -> {
-                                val forecast = forecastUiState.data
-                                WeatherForecastView(forecast, units)
-                                weatherViewModel?.saveWeatherForecast(forecast)
-                            }
-                            is UiState.Error -> {
-                                val forecast = weatherViewModel?.loadWeatherForecast()
-                                if (forecast != null) {
-                                    WeatherForecastView(forecast, units)
-                                    Row(
-                                        modifier = modifier.align(Alignment.BottomCenter)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Warning,
-                                            contentDescription = "",
-                                            tint = Color.Yellow
-                                        )
-                                        Text("Przestażałe dane")
-                                    }
-                                } else {
-                                    Text(text = "Brak danych", color = Color.Red)
-                                }
-                            }
+                    if (weatherUiState is UiState.Error || forecastUiState is UiState.Error) {
+                        Row(
+                            modifier = modifier.align(Alignment.BottomCenter)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Warning,
+                                contentDescription = "",
+                                tint = Color.Yellow
+                            )
+                            Text("Przestażałe dane")
                         }
                     }
                 }
@@ -1251,7 +1275,7 @@ fun WeatherMoreDetailsView(
             .padding(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Column(modifier = modifier) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
                 DetailItem(icon = Icons.Filled.Thermostat, label = "Min/Max", value = "${String.format(
                     getDefault(), "%.1f", weatherResponse.main.tempMin)}° / ${String.format(
@@ -1286,7 +1310,7 @@ fun WeatherMoreDetailsViewLandscape(
             .padding(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Column(modifier = modifier) {
+        Column(modifier = modifier.fillMaxHeight(), verticalArrangement = Arrangement.Center) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
                 DetailItem(icon = Icons.Filled.Thermostat, label = "Min/Max", value = "${String.format(
                     getDefault(), "%.1f", weatherResponse.main.tempMin)}° / ${String.format(
