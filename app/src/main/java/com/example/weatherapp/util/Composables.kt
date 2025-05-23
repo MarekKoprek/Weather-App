@@ -120,7 +120,7 @@ fun MainScreenView(
     }
 
     var topText by remember { mutableStateOf("Podstawowe") }
-    var currentPage by remember { mutableIntStateOf(startPage) }
+    val currentPage by weatherViewModel.currentPage.collectAsState(startPage)
 
     val updateTextBasedOnButton: (Int) -> Unit = { buttonNumber ->
         when (buttonNumber) {
@@ -132,12 +132,12 @@ fun MainScreenView(
             6 -> { topText = "Pogoda" }
             else -> topText
         }
-        currentPage = buttonNumber
+        weatherViewModel.setCurrentPage(buttonNumber)
     }
 
     val refreshButton: () -> Unit = {
-        weatherViewModel.fetchWeatherForCity()
-        weatherViewModel.fetchWeatherForecastForCity()
+        weatherViewModel.updateFavouriteCitiesWeather()
+        weatherViewModel.updateFavouriteCitiesForecast()
     }
 
     when (configuration.orientation) {
@@ -1135,10 +1135,12 @@ fun WeatherDetailsView(
                                 text = "${split[0]} ${split[1]}",
                                 style = MaterialTheme.typography.titleLarge
                             )
-                            Text(
-                                text = split[2],
-                                style = MaterialTheme.typography.titleLarge
-                            )
+                            if(split.size > 2){
+                                Text(
+                                    text = split[2],
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
                         }
                     }
                     else {

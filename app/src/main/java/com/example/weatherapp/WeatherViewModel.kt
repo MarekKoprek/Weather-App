@@ -22,6 +22,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
+import java.io.File
 
 sealed class UiState<out T> {
     object Loading : UiState<Nothing>()
@@ -55,6 +56,9 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     private val _refreshIntervalSeconds = MutableStateFlow("0")
     val refreshIntervalSeconds: StateFlow<String> = _refreshIntervalSeconds.asStateFlow()
 
+    private val _currentPage = MutableStateFlow(1)
+    val currentPage: StateFlow<Int> = _currentPage.asStateFlow()
+
     private var autoRefreshJob: Job? = null
 
     init {
@@ -65,6 +69,10 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         updateFavouriteCities()
         _favouriteCities.value = loadFavouriteCities()
         startAutoRefresh()
+    }
+
+    fun setCurrentPage(page: Int){
+        _currentPage.value = page
     }
 
     private fun checkNetworkConnection(){
@@ -114,7 +122,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun fetchWeatherForCity(){
+    fun fetchWeatherForCity(city: String = _currentCity.value){
         checkNetworkConnection()
         _weatherData.value = UiState.Loading
         viewModelScope.launch {
@@ -127,7 +135,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
                 if (_isNetworkAvailable.value) {
                     val response = apiService.getWeatherDetails(
-                        city = _currentCity.value,
+                        city = city,
                         units = _currentUnits.value,
                         apiKey = apiKey,
                         lang = "pl"
@@ -136,6 +144,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                         val responseBody = response.body()
                         if (responseBody != null) {
                             _weatherData.value = UiState.Success(responseBody)
+                            saveFavouriteCityWeather(city, responseBody)
                         } else {
                             _weatherData.value = UiState.Error("Otrzymano pomyślną odpowiedź, ale bez danych (puste ciało).")
                         }
@@ -185,7 +194,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun fetchWeatherForecastForCity(){
+    fun fetchWeatherForecastForCity(city: String = _currentCity.value){
         checkNetworkConnection()
         _weatherForecast.value = UiState.Loading
         viewModelScope.launch {
@@ -198,7 +207,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
                 if (_isNetworkAvailable.value) {
                     val response = apiService.getWeatherForecast(
-                        city = _currentCity.value,
+                        city = city,
                         units = _currentUnits.value,
                         apiKey = apiKey,
                         lang = "pl"
@@ -207,6 +216,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                         val responseBody = response.body()
                         if (responseBody != null) {
                             _weatherForecast.value = UiState.Success(responseBody)
+                            saveFavouriteCityForecast(city, responseBody)
                         } else {
                             _weatherForecast.value = UiState.Error("Otrzymano pomyślną odpowiedź, ale bez danych (puste ciało).")
                         }
@@ -385,5 +395,39 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     override fun onCleared() {
         super.onCleared()
         autoRefreshJob?.cancel()
+    }
+
+    fun updateFavouriteCitiesWeather(){
+        _favouriteCities.value?.forEach { city ->
+            fetchWeatherForCity(city)
+        }
+        fetchWeatherForCity()
+    }
+
+    fun updateFavouriteCitiesForecast(){
+        _favouriteCities.value?.forEach { city ->
+            fetchWeatherForecastForCity(city)
+        }
+        fetchWeatherForecastForCity()
+    }
+
+    private fun saveFavouriteCityWeather(city: String, weatherResponse: WeatherResponse){
+        val name = "weather_${city.lowercase().replace(" ", "_")}.json"
+        val context: Context = getApplication()
+        val file = File(context.filesDir, name)
+
+        val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+        val json = moshi.adapter(WeatherResponse::class.java).toJson(weatherResponse)
+        file.writeText(json)
+    }
+
+    private fun saveFavouriteCityForecast(city: String, weatherForecast: WeatherForecast){
+        val name = "forecast_${city.lowercase().replace(" ", "_")}.json"
+        val context: Context = getApplication()
+        val file = File(context.filesDir, name)
+
+        val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+        val json = moshi.adapter(WeatherForecast::class.java).toJson(weatherForecast)
+        file.writeText(json)
     }
 }
